@@ -1,0 +1,1644 @@
+---
+title: "ncdb_testis_stage2_seminoma"
+output: html_document
+date: "2025-05-22"
+---
+# 1 - Setup
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, results = 'hide', message = FALSE, warning = FALSE)
+```
+# 1.1 - Load required packages
+```{r}
+library(devtools)
+library(tidyverse)
+library(ggplot2)
+library(descr)
+library(survival) 
+library(survminer)
+library(scales)
+library(lmtest)
+library(riskRegression)
+library(ggsci)
+library(WeightIt)
+library(cobalt)
+library(sjPlot)
+library(sjlabelled)
+library(sjmisc)
+library(export)
+library(broom)
+library(extrafont)
+library(patchwork)
+```
+# 1.2 - Create import function
+```{r}
+clean_puf<-function(puf_filePath){
+
+puf<-data.frame()
+
+# Calculate widths based on column ranges provided in data dictionary
+colLimits<-c(0,37,47,48,49,52,53,55,56,58,59,60,61,62,63,64,72,74,
+       76,78,82,86,87,91,92,93,94,97,99,101,109,111,116,
+       121,126,130,135,140,145,149,151,152,154,155,158,159,160,161,
+       162,163,164,167,170,173,176,179,182,185,188,191,194,197,
+       200,203,206,209,212,215,218,221,224,227,230,233,236,239,
+       245,253,261,269,271,272,273,274,275,283,284,285,293,294,
+       295,298,299,307,315,317,325,327,335,337,339,340,348,349,350,
+	   351,352,353,361,362,364,366,368,370,372,373,374,375,377,378,
+	   381,382,383,384,385,386,387,388,389,390,392,394,399,402,404,
+	   410,412,414,416,421,424,426,432,434,436,438,443,446,448,454,
+	   456,458,460,466,471,472,473,480,481,482,489,495,499,514,529,
+	   533,548,563,567,582,597,601,616,631,635,650,665,669,684,699,
+	   703,704,705,706,710,711,712,713,718,719,721,725,726,727,733,
+	   734,735,736,737,738,742,746,747,748,751,752,755,756,758,759,
+	   760,761,763,765,767,769,771,773,775,776,777,778,779,786,787,
+	   794,795,799,803,807,808,809,810,811,812,813,814,817,818,819,
+	   824,825,826,827,828,829,836,839,840,841,842,843,844,845,846,
+	   847,849,853,854,855,856,857,858,859,860,862,866,868,869,870,
+	   872,874,876,878,880,882,884,886,887,888,891,894,895,896,901,
+	   902,903,904,905,906,909,910,912,915,920,921,922,923,926,927,
+	   928,929,934,935,937,939,943,944,946,947,948,956,964,966,967,
+	   968,969,977,978,979,994,1009,1013,1028,1032,1047,1049,1050,
+	   1051,1052,1053,1054,1058,1062,1066,1070,1071,1072,1073,1074,1079)
+
+delta<-vector(mode="integer",length=340)
+
+# Iterate through columns and assign names
+
+for(i in 2:341)
+{
+  delta[i]<-colLimits[i]-colLimits[i-1]
+}
+
+puf_colNames<-c(
+	"PUF_CASE_ID",
+	"PUF_FACILITY_ID",
+	"FACILITY_TYPE_CD",
+	"FACILITY_LOCATION_CD",
+	"AGE",
+	"SEX",
+	"RACE",
+	"SPANISH_HISPANIC_ORIGIN",
+	"INSURANCE_STATUS",
+	"MED_INC_QUAR_00",
+	"NO_HSD_QUAR_00",
+	"UR_CD_03",
+	"MED_INC_QUAR_12",
+	"NO_HSD_QUAR_12",
+	"UR_CD_13",
+	"CROWFLY",
+	"CDCC_TOTAL_BEST",
+	"SEQUENCE_NUMBER",
+	"CLASS_OF_CASE",
+	"YEAR_OF_DIAGNOSIS",
+	"PRIMARY_SITE",
+	"LATERALITY",
+	"HISTOLOGY",
+	"BEHAVIOR",
+	"GRADE",
+	"DIAGNOSTIC_CONFIRMATION",
+	"TUMOR_SIZE",
+	"REGIONAL_NODES_POSITIVE",
+	"REGIONAL_NODES_EXAMINED",
+	"DX_STAGING_PROC_DAYS",
+	"RX_SUMM_DXSTG_PROC",
+	"TNM_CLIN_T",
+	"TNM_CLIN_N",
+	"TNM_CLIN_M",
+	"TNM_CLIN_STAGE_GROUP",
+	"TNM_PATH_T",
+	"TNM_PATH_N",
+	"TNM_PATH_M",
+	"TNM_PATH_STAGE_GROUP",
+	"TNM_EDITION_NUMBER",
+	"ANALYTIC_STAGE_GROUP",
+	"CS_METS_AT_DX",
+	"CS_METS_EVAL",
+	"CS_EXTENSION",
+	"CS_TUMOR_SIZEEXT_EVAL",
+	"CS_METS_DX_BONE",
+	"CS_METS_DX_BRAIN",
+	"CS_METS_DX_LIVER",
+	"CS_METS_DX_LUNG",
+	"LYMPH_VASCULAR_INVASION",
+	"CS_SITESPECIFIC_FACTOR_1",
+	"CS_SITESPECIFIC_FACTOR_2",
+	"CS_SITESPECIFIC_FACTOR_3",
+	"CS_SITESPECIFIC_FACTOR_4",
+	"CS_SITESPECIFIC_FACTOR_5",
+	"CS_SITESPECIFIC_FACTOR_6",
+	"CS_SITESPECIFIC_FACTOR_7",
+	"CS_SITESPECIFIC_FACTOR_8",
+	"CS_SITESPECIFIC_FACTOR_9",
+	"CS_SITESPECIFIC_FACTOR_10",
+	"CS_SITESPECIFIC_FACTOR_11",
+	"CS_SITESPECIFIC_FACTOR_12",
+	"CS_SITESPECIFIC_FACTOR_13",
+	"CS_SITESPECIFIC_FACTOR_14",
+	"CS_SITESPECIFIC_FACTOR_15",
+	"CS_SITESPECIFIC_FACTOR_16",
+	"CS_SITESPECIFIC_FACTOR_17",
+	"CS_SITESPECIFIC_FACTOR_18",
+	"CS_SITESPECIFIC_FACTOR_19",
+	"CS_SITESPECIFIC_FACTOR_20",
+	"CS_SITESPECIFIC_FACTOR_21",
+	"CS_SITESPECIFIC_FACTOR_22",
+	"CS_SITESPECIFIC_FACTOR_23",
+	"CS_SITESPECIFIC_FACTOR_24",
+	"CS_SITESPECIFIC_FACTOR_25",
+	"CS_VERSION_LATEST",
+	"DX_RX_STARTED_DAYS",
+	"DX_SURG_STARTED_DAYS",
+	"DX_DEFSURG_STARTED_DAYS",
+	"RX_SUMM_SURG_PRIM_SITE",
+	"RX_HOSP_SURG_APPR_2010",
+	"RX_SUMM_SURGICAL_MARGINS",
+	"RX_SUMM_SCOPE_REG_LN_SUR",
+	"RX_SUMM_SURG_OTH_REGDIS",
+	"SURG_DISCHARGE_DAYS",
+	"READM_HOSP_30_DAYS",
+	"REASON_FOR_NO_SURGERY",
+	"DX_RAD_STARTED_DAYS",
+	"RAD_LOCATION_OF_RX",
+	"RX_SUMM_SURGRAD_SEQ",
+	"RAD_ELAPSED_RX_DAYS",
+	"REASON_FOR_NO_RADIATION",
+	"DX_SYSTEMIC_STARTED_DAYS",
+	"DX_CHEMO_STARTED_DAYS",
+	"RX_SUMM_CHEMO",
+	"DX_HORMONE_STARTED_DAYS",
+	"RX_SUMM_HORMONE",
+	"DX_IMMUNO_STARTED_DAYS",
+	"RX_SUMM_IMMUNOTHERAPY",
+	"RX_SUMM_TRNSPLNT_ENDO",
+	"RX_SUMM_SYSTEMIC_SUR_SEQ",
+	"DX_OTHER_STARTED_DAYS",
+	"RX_SUMM_OTHER",
+	"PALLIATIVE_CARE",
+	"RX_SUMM_TREATMENT_STATUS",
+	"PUF_30_DAY_MORT_CD",
+	"PUF_90_DAY_MORT_CD",
+	"DX_LASTCONTACT_DEATH_MONTHS",
+	"PUF_VITAL_STATUS",
+	"RX_HOSP_SURG_PRIM_SITE",
+	"RX_HOSP_CHEMO",
+	"RX_HOSP_IMMUNOTHERAPY",
+	"RX_HOSP_HORMONE",
+	"RX_HOSP_OTHER",
+	"PUF_MULT_SOURCE",
+	"PUF_REFERENCE_DATE_FLAG",
+	"RX_SUMM_SCOPE_REG_LN_2012",
+	"RX_HOSP_DXSTG_PROC",
+	"PALLIATIVE_CARE_HOSP",
+	"TUMOR_SIZE_SUMMARY_16",
+	"METS_AT_DX_OTHER",
+	"METS_AT_DX_DISTANT_LN",
+	"METS_AT_DX_BONE",
+	"METS_AT_DX_BRAIN",
+	"METS_AT_DX_LIVER",
+	"METS_AT_DX_LUNG",
+	"NO_HSD_QUAR_2016",
+	"MED_INC_QUAR_2016",
+	"PUF_MEDICAID_EXPN_CODE",
+	"PHASE_I_RT_VOLUME",
+	"PHASE_I_RT_TO_LN",
+	"PHASE_I_DOSE_FRACT",
+	"PHASE_I_NUM_FRACT",
+	"PHASE_I_BEAM_TECH",
+	"PHASE_I_TOTAL_DOSE",
+	"PHASE_I_RT_MODALITY",
+	"PHASE_II_RT_VOLUME",
+	"PHASE_II_RT_TO_LN",
+	"PHASE_II_DOSE_FRACT",
+	"PHASE_II_NUM_FRACT",
+	"PHASE_II_BEAM_TECH",
+	"PHASE_II_TOTAL_DOSE",
+	"PHASE_II_RT_MODALITY",
+	"PHASE_III_RT_VOLUME",
+	"PHASE_III_RT_TO_LN",
+	"PHASE_III_DOSE_FRACT",
+	"PHASE_III_NUM_FRACT",
+	"PHASE_III_BEAM_TECH",
+	"PHASE_III_TOTAL_DOSE",
+	"PHASE_III_RT_MODALITY",
+	"NUMBER_PHASES_RAD_RX",
+	"RAD_RX_DISC_EARLY",
+	"TOTAL_DOSE",
+	"ADENOID_CYSTIC_BSLD",
+	"ADENOPATHY",
+	"AFP_POST_ORCH_RANGE",
+	"AFP_POST_ORCH_VALUE",
+	"AFP_PRE_INTERP",
+	"AFP_PRE_ORCH_RANGE",
+	"AFP_PRE_ORCH_VALUE",
+	"AFP_PRE_VALUE",
+	"AJCC_ID",
+	"AJCC_TNM_CLIN_M",
+	"AJCC_TNM_CLIN_N",
+	"AJCC_TNM_CLIN_N_SFX",
+	"AJCC_TNM_CLIN_STG_GRP",
+	"AJCC_TNM_CLIN_T",
+	"AJCC_TNM_CLIN_T_SFX",
+	"AJCC_TNM_PATH_M",
+	"AJCC_TNM_PATH_N",
+	"AJCC_TNM_PATH_N_SFX",
+	"AJCC_TNM_PATH_STG_GRP",
+	"AJCC_TNM_PATH_T",
+	"AJCC_TNM_PATH_T_SFX",
+	"AJCC_TNM_POST_PATH_M",
+	"AJCC_TNM_POST_PATH_N",
+	"AJCC_TNM_POST_PATH_N_SFX",
+	"AJCC_TNM_POST_PATH_STG_GRP",
+	"AJCC_TNM_POST_PATH_T",
+	"AJCC_TNM_POST_PATH_T_SFX",
+	"ALBUMIN_PRE_TX_LEVL",
+	"ANEMIA",
+	"B_SYMPTOMS",
+	"BASAL_DIAMETER",
+	"BETA2MG_PRE_TX_LVL",
+	"BEYOND_CAPSULE",
+	"BILIRUBIN_PRE_UNIT",
+	"BILIRUBIN_PRE_VALUE",
+	"BONE_INVASION",
+	"BRAIN_MOL_MARKERS",
+	"BRESLOW_THICKNESS",
+	"CA125_PRE_INTERP",
+	"CEA_PRE_INTERP",
+	"CEA_PRE_VALUE",
+	"CHROMOSOME_19QLOH",
+	"CHROMOSOME_1PLOH",
+	"CHROMOSOME_3_STATUS",
+	"CHROMOSOME_8Q_STAT",
+	"CREATININE_PRE_UNIT",
+	"CREATININE_PRE_VALU",
+	"CRM",
+	"ENE_CLIN_HN",
+	"ENE_CLIN_NOT_HN",
+	"ENE_PATH_HN",
+	"ENE_PATH_NOT_HN",
+	"ER_PERCENT_POS_OR_RNG",
+	"ER_SUMMARY",
+	"ER_TOTAL_ALLRED",
+	"ESOPH_EPICENTER",
+	"EXTRAVASC_MATRIX",
+	"FIBROSIS_SCORE",
+	"FIGO_STAGE",
+	"GEST_PROGNOST_INDEX",
+	"GLEASON_PAT_CLIN",
+	"GLEASON_PAT_PATH",
+	"GLEASON_SCORE_CLIN",
+	"GLEASON_SCORE_PATH",
+	"GLEASON_SCORE_TERTIARY_PT",
+	"GRADE_CLIN",
+	"GRADE_PATH",
+	"GRADE_PATH_POST",
+	"HCG_POST_ORCH_RANGE",
+	"HCG_POST_ORCH_VALUE",
+	"HCG_PRE_ORCH_RANGE",
+	"HCG_PRE_ORCH_VALUE",
+	"HER2_ICH_SUMMARY",
+	"HER2_ISH_DUAL_NUM",
+	"HER2_ISH_DUAL_RATIO",
+	"HER2_ISH_SINGLE_NUM",
+	"HER2_ISH_SUMMARY",
+	"HER2_OVERALL_SUMM",
+	"HERITABLE_TRAIT",
+	"HIGH_RISK_CYTOGENET",
+	"HIGH_RISK_HIST_FEAT",
+	"HIV_STATUS",
+	"IMMUNE_SUPP",
+	"INR_PRO_TIME",
+	"IPSI_ADRENAL_INVOL",
+	"JAK2",
+	"KI67",
+	"KIT_GENE_IHC",
+	"KRAS",
+	"LDH_POST_ORCH_RANGE",
+	"LDH_PRE_ORCH_RANGE",
+	"LDH_PRE_TX_LEVEL",
+	"LDH_PRE_TX_VALUE",
+	"LDH_UPPER_NORMAL",
+	"LN_DIST_MEDIAS_SCALN",
+	"LN_DISTANT_METHOD",
+	"LN_FEM_ING_PARA_APELV",
+	"LN_ITC",
+	"LN_LATERALITY",
+	"LN_METHOD_FEMING",
+	"LN_METHOD_PARA_AORT",
+	"LN_METHOD_PELVIC",
+	"LN_POS_AX_LEVELS_I_II",
+	"LN_SIZE",
+	"LNHN_LEVELS_I_III",
+	"LNHN_LEVELS_IV_V",
+	"LNHN_LEVELS_OTHER",
+	"LNHN_LEVELS_VI_VII",
+	"LYMPHOCYTOSIS",
+	"MAJOR_VEIN_INVOLV",
+	"METHYLATION_O6MGMT",
+	"MICROVASC_DENSITY",
+	"MITOTIC_COUNT_UVEA",
+	"MITOTIC_RATE_MELANO",
+	"MSI",
+	"MULTIGENE_METHOD",
+	"MULTIGENE_RESULTS",
+	"NCCN_IPI",
+	"NUM_CORES_EXAM",
+	"NUM_CORES_POS",
+	"NUM_NODES_EXAM_PARA_A",
+	"NUM_NODES_POS_PARA_A",
+	"NUM_PELV_NODES_EXAM",
+	"NUM_PELV_NODES_POS",
+	"ONCOTYPE_RISK_DCIS",
+	"ONCOTYPE_RISK_INVAS",
+	"ONCOTYPE_SCORE_DCIS",
+	"ONCOTYPE_SCORE_INV",
+	"ORGANOMEGALY",
+	"P_SCLER_CHOLANGITIS",
+	"PERCNT_NECROS_POST",
+	"PERINEURAL_INV",
+	"PERIPH_BLOOD_INV",
+	"PERITONEAL_CYTOL",
+	"PLEURAL_EFFUSION",
+	"PLEURAL_INV",
+	"PR_PERCENT_POS_OR_RNG",
+	"PR_SUMMARY",
+	"PR_TOTAL_ALLRED",
+	"PROSTATE_PATH_EXT",
+	"PSA",
+	"RSPNS_TO_NEOADJUVT",
+	"S_CAT_CLIN",
+	"S_CAT_PATH",
+	"SARCOMATOID",
+	"SCHEMA_DISC_1",
+	"SCHEMA_DISC_2",
+	"SCHEMA_DISC_3",
+	"SCHEMA_ID",
+	"SEP_NODULES",
+	"SLN_EXAM",
+	"SLN_POS",
+	"THICKNESS",
+	"THROMBOCYTOPENIA",
+	"TUMOR_DEPOSITS",
+	"TUMOR_GROWTH_PAT",
+	"ULCERATION",
+	"SENTINEL_LNBX_STARTED_DAY",
+	"REG_LN_DISS_STARTED_DAY",
+	"RESID_POST_CYTOREDU",
+	"NO_HSD_QUAR_2020",
+	"MED_INC_QUAR_2020",
+	"SARSCOV2_POS",
+	"SARSCOV2_POS_DAYS",
+	"SARSCOV2_TEST",
+	"GRADE_POST_THERAPY_CLIN_YC",
+	"AJCC_TNM_POST_CLIN_YC_M",
+	"AJCC_TNM_POST_CLIN_YC_N",
+	"AJCC_TNM_POST_CLIN_YC_N_SUF",
+	"AJCC_TNM_POST_CLIN_YC_T",
+	"AJCC_TNM_POST_CLIN_YC_T_SUF",
+	"AJCC_TNM_POST_THER_CLIN_YC_GRP",
+	"MACROSCOPIC_EVAL_TMESORECTUM",
+	"DERIVED_RAI_STAGE",
+	"P16",
+	"LN_STATUS_PELVIC",
+	"LN_STATUS_PARA_AORTIC",
+	"LN_STATUS_FEMORAL_INGUINAL",
+	"RX_HOSP_SURG_BREAST",
+	"RX_SUMM_SURG_BREAST",
+	"RX_HOSP_RECON_BREAST",
+	"RX_SUMM_RECON_BREAST",
+	"ALK_REARRANGEMENT",
+	"EGFR_MUTATIONAL_ANALYSIS",
+	"BRAF_MUTATIONAL_ANALYSIS",
+	"NRAS_MUTATIONAL_ANALYSIS",
+	"CA_19_9_PRETX_LAB_VALUE"
+)
+
+# Read the file with the widths and classes given above
+puf<-read.fwf(puf_filePath,
+              widths=delta[2:341],
+              header=FALSE,
+              col.names=puf_colNames,
+              sep="\t",
+              na.strings=c(" ","  ","   "))
+
+return(puf)
+}
+```
+# 1.3 - Import data
+```{r, cache=TRUE}
+filePath <- "C:/Users/josia/Documents/urology/research/ncdb/PUF_GU_2025_03_27/NCDB_PUF_DATA_Mar-27-2025/NCDBPUF_Testis.0.2022.0.dat"
+
+puf_main <- clean_puf(filePath)
+```
+# 1.4 - Clean data
+```{r}
+# Start by removing anything that is not pure seminoma/nsGCT
+# (based on ICD 3 manual and https://training.seer.cancer.gov/testicular/abstract-code-stage/morphology.html)
+puf <- puf_main %>%
+  filter(HISTOLOGY == 9061 | #seminoma codes
+         HISTOLOGY == 9062 |
+         HISTOLOGY == 9070 | #nsGCT codes
+         HISTOLOGY == 9071 |
+         HISTOLOGY == 9080 |
+         HISTOLOGY == 9081 |
+         HISTOLOGY == 9082 |
+         HISTOLOGY == 9083 |
+         HISTOLOGY == 9100 |
+         HISTOLOGY == 9101 |
+         HISTOLOGY == 9102)
+
+# Reconcile pre/post 2018 data; reconcile coding variances; remove patients without complete orch path
+## cN data
+puf <- puf %>%
+  mutate(cN_numeric = ifelse(AJCC_TNM_CLIN_N == "cN1            ", 1,
+              ifelse(AJCC_TNM_CLIN_N == "cN2            ", 2,
+              ifelse(AJCC_TNM_CLIN_N == "cN3            ", 3,
+              ifelse(AJCC_TNM_CLIN_N == "cN0            ", 0,
+              ifelse(TNM_CLIN_N == "   c1", 1,
+              ifelse(TNM_CLIN_N == "  c1A", 1,
+              ifelse(TNM_CLIN_N == "  c1B", 1,
+              ifelse(TNM_CLIN_N == "   c0", 0,
+              ifelse(TNM_CLIN_N == "   c2", 2,
+              ifelse(TNM_CLIN_N == "  c2B", 2,
+              ifelse(TNM_CLIN_N == "   c3", 3, TNM_CLIN_N)))))))))))) %>%
+  mutate(cN_numeric = as.numeric(cN_numeric)) %>%
+  mutate(cN_factor = ifelse(AJCC_TNM_CLIN_N == "cN1            ", "cN1",
+              ifelse(AJCC_TNM_CLIN_N == "cN2            ", "cN2",
+              ifelse(AJCC_TNM_CLIN_N == "cN3            ", "cN3",
+              ifelse(AJCC_TNM_CLIN_N == "cN0            ", "cN0",
+              ifelse(TNM_CLIN_N == "   c1", "cN1",
+              ifelse(TNM_CLIN_N == "  c1A", "cN1",
+              ifelse(TNM_CLIN_N == "  c1B", "cN1",
+              ifelse(TNM_CLIN_N == "   c0",  "cN0",
+              ifelse(TNM_CLIN_N == "   c2",  "cN2",
+              ifelse(TNM_CLIN_N == "  c2B",  "cN2",
+              ifelse(TNM_CLIN_N == "   c3",  "cN3", TNM_CLIN_N)))))))))))) %>%
+  filter(cN_factor == "cN1" | cN_factor == "cN2" | cN_factor == "cN3") %>% # select only stage II disease
+  mutate(cN_factor = factor(cN_factor, levels = c("cN1", "cN2", "cN3"))) # add factor version to facilitate analysis
+
+## pN data
+puf <- puf %>%
+  mutate(pN_numeric = ifelse(AJCC_TNM_PATH_N == "pN1            " | AJCC_TNM_PATH_N == "cN1            ", 1,
+              ifelse(AJCC_TNM_PATH_N == "pN2            " | AJCC_TNM_PATH_N == "cN2            ", 2,
+              ifelse(AJCC_TNM_PATH_N == "pN3            " | AJCC_TNM_PATH_N == "cN3            ", 3,
+              ifelse(AJCC_TNM_PATH_N == "pN0            " | AJCC_TNM_PATH_N == "cN0            ", 0,
+              ifelse(AJCC_TNM_PATH_N == "pNX            " | AJCC_TNM_PATH_N == "cNX            " | TNM_PATH_N == "   cX", NA,
+              ifelse(TNM_PATH_N == "   c0" | TNM_PATH_N == "   p0", 0,
+              ifelse(TNM_PATH_N == "   p1", 1,
+              ifelse(TNM_PATH_N == "   p2" | TNM_PATH_N == "  p2B", 2,
+              ifelse(TNM_PATH_N == "   p3", 3,
+              ifelse(TNM_PATH_N == "   pX", NA, TNM_PATH_N))))))))))) %>%
+  mutate(pN_numeric = as.numeric(pN_numeric)) %>%
+  mutate(pN_factor = ifelse(AJCC_TNM_PATH_N == "pN1            " | AJCC_TNM_PATH_N == "cN1            ", "pN1",
+              ifelse(AJCC_TNM_PATH_N == "pN2            " | AJCC_TNM_PATH_N == "cN2            ", "pN2",
+              ifelse(AJCC_TNM_PATH_N == "pN3            " | AJCC_TNM_PATH_N == "cN3            ", "pN3",
+              ifelse(AJCC_TNM_PATH_N == "pN0            " | AJCC_TNM_PATH_N == "cN0            ", "pN0",
+              ifelse(AJCC_TNM_PATH_N == "pNX            " | AJCC_TNM_PATH_N == "cNX            " | TNM_PATH_N == "   cX", NA,
+              ifelse(TNM_PATH_N == "   c0" | TNM_PATH_N == "   p0",  "pN0",
+              ifelse(TNM_PATH_N == "   p1",  "pN1",
+              ifelse(TNM_PATH_N == "   p2" | TNM_PATH_N == "  p2B",  "pN2",
+              ifelse(TNM_PATH_N == "   p3",  "pN3",
+              ifelse(TNM_PATH_N == "   pX", NA, TNM_PATH_N))))))))))) %>%
+  mutate(pN_factor = factor(pN_factor, levels = c("pN1", "pN2", "pN3", "pN0"))) # add factor version to facilitate analysis
+
+## pT data
+puf <- puf %>%
+  mutate(pT = ifelse(AJCC_TNM_PATH_T == "pT1            ", "pT1",
+              ifelse(AJCC_TNM_PATH_T == "pT1a           ", "pT1",
+              ifelse(AJCC_TNM_PATH_T == "pT1b           ", "pT1",
+              ifelse(AJCC_TNM_PATH_T == "pT2            ", "pT2",
+              ifelse(AJCC_TNM_PATH_T == "pT3            ", "pT3",
+              ifelse(AJCC_TNM_PATH_T == "pT4            ", "pT4",
+              ifelse(AJCC_TNM_PATH_T == "pTis           ", "pTis",
+              ifelse(AJCC_TNM_PATH_T == "pTx            ", "pTx",
+              ifelse(TNM_PATH_T == "   p0", "pT0",
+              ifelse(TNM_PATH_T == "   p1", "pT1",
+              ifelse(TNM_PATH_T == "  p1C", "pT1",
+              ifelse(TNM_PATH_T == "   p2", "pT2",
+              ifelse(TNM_PATH_T == "  p2B", "pT2",
+              ifelse(TNM_PATH_T == "  p2C", "pT2",
+              ifelse(TNM_PATH_T == "   p3", "pT3",
+              ifelse(TNM_PATH_T == "   p4", "pT4",
+              ifelse(TNM_PATH_T == "  pIS", "pTis",
+              ifelse(TNM_PATH_T == "   pX", "pTx", TNM_PATH_T))))))))))))))))))) %>%
+  mutate(pT = factor(pT, levels = c("pT1", "pT2", "pT3", "pT4", "pTis", "pT0", "pTx"
+  )))
+
+## Bin tumor size data (<3cm, 3cm+, NA)
+puf <- puf %>%
+  mutate(tumorsize = ifelse(TUMOR_SIZE <= 29 | TUMOR_SIZE == 990 | TUMOR_SIZE == 991, "<3cm",
+                     ifelse(TUMOR_SIZE >= 30 & TUMOR_SIZE <= 989, "≥3cm",
+                     ifelse(TUMOR_SIZE_SUMMARY_16 <= 29 | TUMOR_SIZE_SUMMARY_16 == 990, "<3cm", 
+                     ifelse(TUMOR_SIZE_SUMMARY_16 >= 30 & TUMOR_SIZE_SUMMARY_16 <= 989, "≥3cm", NA))))) %>%
+  mutate(tumorsize = factor(tumorsize, levels = c("<3cm", "≥3cm")))
+
+## Bin orchiectomy margin data "pR" (R0, R1, NA)
+puf <- puf %>%
+  mutate(pR = ifelse(RX_SUMM_SURGICAL_MARGINS == 0, "R0",
+              ifelse(RX_SUMM_SURGICAL_MARGINS <= 3, "R1", NA))) %>%
+  mutate(pR = factor(pR, levels = c("R0", "R1")))
+
+## Exclude metastatic disease - only patients with explicitly recorded M0 staging
+puf <- puf %>% 
+  filter(TNM_CLIN_M == "    0" |
+         TNM_CLIN_M == "   c0" |
+         AJCC_TNM_CLIN_M == "cM0            ")
+
+## Remove patients without complete orchiectomy path
+puf <- puf %>%
+  drop_na(tumorsize) %>% #no tumor size data
+  drop_na(pR) %>% #no margin data
+  drop_na(pT) #no pT stage data
+
+# Create status flags to mark patients who meet certain criteria
+## - Seminoma vs nsGCT ("sem_YN" > "Pure seminoma", "nsGCT")
+puf <- puf %>%
+  mutate(sem_YN = ifelse(HISTOLOGY == 9061 | HISTOLOGY == 9062, "Pure seminoma", "nsGCT")) %>%
+  mutate(sem_YN = factor(sem_YN, levels = c("Pure seminoma", "nsGCT")))
+
+## - Primary treatment type ("prim_tx" > "RPLND", "Chemo", "RT")
+puf <- puf %>%
+  ## (first flag all the RPLND upfront patients)
+  mutate(prim_tx = ifelse(RX_SUMM_SCOPE_REG_LN_2012 == "3" | # Number of regional lymph nodes removed unknown, not stated; regional lymph nodes removed, NOS
+                          RX_SUMM_SCOPE_REG_LN_2012 == "4" | # 1-3 regional lymph nodes removed
+                          RX_SUMM_SCOPE_REG_LN_2012 == "5" | # 4 or more regional lymph nodes removed
+                          RX_SUMM_SCOPE_REG_LN_SUR == "1", # Regional lymph node surgery was performed
+                          ifelse(RX_SUMM_SURGRAD_SEQ == "0" | # No radiation therapy and/or surgical procedures
+                                 RX_SUMM_SURGRAD_SEQ == "3", # Radiation after surgery
+                                 ifelse(RX_SUMM_SYSTEMIC_SUR_SEQ == "0" | # No systemic therapy and/or surgical procedures (Tabakin et al 2020)
+                                        RX_SUMM_SYSTEMIC_SUR_SEQ == "3", # Systemic therapy after surgery
+                                        "RPLND", NA), NA), NA), NA) %>% # Infer RPLND upfront if above conditions met
+  ## (next flag all the chemo upfront patients)
+  mutate(prim_tx = ifelse(is.na(prim_tx),
+                          ifelse(RX_SUMM_CHEMO == "1" | # Chemotherapy administered as first course therapy, but the type and number of agents is not documented in patient record
+                                 RX_SUMM_CHEMO == "2" | # Single-agent chemotherapy administered as first course therapy
+                                 RX_SUMM_CHEMO == "3", # Multiagent chemotherapy administered as first course therapy
+                                 "Chemo", prim_tx), prim_tx)) %>% # Infer chemo upfront on the remaining if above conditions met
+  ## (next flag all the RT upfront patients)
+  mutate(prim_tx = ifelse(is.na(prim_tx),
+                          ifelse(REASON_FOR_NO_RADIATION == "0", # Radiation therapy was administered
+                                 "RT", prim_tx), prim_tx)) %>% # Infer RT upfront on the remaining if above condition met
+  mutate(prim_tx = factor(prim_tx, levels = c("RPLND", "Chemo", "RT")))
+                                                             
+## - Delayed chemo or not ("delayed_chemo" > "Yes", "No")
+puf <- puf %>%
+  mutate(delayed_chemo = ifelse(prim_tx == "RPLND", # focused on delayed tx after RPLND
+                                  ifelse(RX_SUMM_SYSTEMIC_SUR_SEQ == "3", # Systemic therapy after surgery
+                                         "Yes", "No/Unknown"),  "No/Unknown"))
+
+## - Delayed RT or not ("delayed_rt" > "Yes", "No")
+puf <- puf %>%
+  mutate(delayed_rt = ifelse(prim_tx == "RPLND", # focused on delayed tx after RPLND
+                               ifelse(RX_SUMM_SURGRAD_SEQ == "2", # RT after surgery
+                                      "Yes", "No/Unknown"), "No/Unknown"))
+
+## - Delayed RPLND or not ("delayed_rplnd" >"Yes", "No")
+puf <- puf %>%
+  mutate(delayed_rplnd = ifelse(prim_tx == "RT" | prim_tx == "Chemo", # RT or chemo were primary treatment
+                                  ifelse(RX_SUMM_SCOPE_REG_LN_2012 == "3" | # Number of regional lymph nodes removed unknown, not stated; regional lymph nodes removed, NOS
+                                         RX_SUMM_SCOPE_REG_LN_2012 == "4" | # 1-3 regional lymph nodes removed
+                                         RX_SUMM_SCOPE_REG_LN_2012 == "5" | # 4 or more regional lymph nodes removed
+                                         RX_SUMM_SCOPE_REG_LN_SUR == "1", # Regional lymph node surgery was performed
+                                         "Yes", "No/Unknown"), "No/Unknown"))
+
+## - Create delayed treatment-free survival variable and intervals
+puf <- puf %>%
+  mutate(delayed_any_interval = ifelse(delayed_chemo == "Yes", # if got delayed chemo, use time to chemo (mo)
+                                       DX_CHEMO_STARTED_DAYS/30, NA)) %>%
+  mutate(delayed_any_interval = ifelse(delayed_chemo == "No/Unknown", # if no delayed tx then use survival from OS KM
+                                       DX_LASTCONTACT_DEATH_MONTHS, delayed_any_interval)) %>%
+  mutate(delayed_any_interval = ifelse(is.na(delayed_any_interval), DX_LASTCONTACT_DEATH_MONTHS, delayed_any_interval)) %>% #anything else that's NA use survival from OS KM
+  mutate(delayed_any_KM = ifelse(delayed_chemo == "Yes", TRUE,
+                                 ifelse(PUF_VITAL_STATUS == "0", TRUE, FALSE))) # KM flag for alive+salvage chemo free/not salvage free or not alive
+
+## - Remove any patients who don't have upfront treatment data
+puf <- puf %>%
+  drop_na(prim_tx)
+
+## - Create adjuvant vs salvage flag for patients who underwent additional chemo
+## - We assume threshold is 2 months here - see Discussion
+puf <- puf%>%
+  mutate(adj_salv = ifelse(delayed_chemo == "Yes",
+                           ifelse(delayed_any_interval <= 2, "Adjuvant", "Salvage"), "None/Unknown"))
+```
+# 1.5 - Prep data
+```{r}
+# Bin remaining variables and set appropriate classes
+## Year of diagnosis - break down into (2004 - 2010, 2011 - 2016, 2017 - 2022)
+puf <- puf %>%
+  mutate(year_thirds = ifelse(YEAR_OF_DIAGNOSIS >= 2004 & YEAR_OF_DIAGNOSIS <= 2010, "2004 - 2010",
+                       ifelse(YEAR_OF_DIAGNOSIS >= 2011 & YEAR_OF_DIAGNOSIS <= 2016, "2011 - 2016",
+                       ifelse(YEAR_OF_DIAGNOSIS >= 2017, "2017 - 2022", NA)))) %>%
+  mutate(year_thirds = factor(year_thirds, levels = c("2004 - 2010", "2011 - 2016", "2017 - 2022")))
+
+## Charlson-Deyo
+puf <- puf %>%
+  mutate(CDCC_TOTAL_BEST = factor(CDCC_TOTAL_BEST, levels = c(0, 1, 2, 3), labels = c("CD0", "CD1", "CD2", "CD3")))
+
+## Race - convert to census categories (non-hispanic white, hispanic, black/AA, American Indian/Alaska Native, Asian, Native Hawaiian/Pacific Islander, Other/Unknown)
+puf <- puf %>%
+  mutate(race_census = ifelse(RACE == 1, ifelse(SPANISH_HISPANIC_ORIGIN == 0 | SPANISH_HISPANIC_ORIGIN == 9, "White", "Hispanic"),
+                       ifelse(RACE == 2, "Black",
+                       ifelse(RACE == 3, "American Indian/Alaska Native",
+                       ifelse(RACE >= 4 & RACE <= 17, "Asian",
+                       ifelse(RACE == 96, "Asian",
+                       ifelse(RACE >= 20 & RACE <= 32, "Native Hawaiian/Pacific Islander",
+                       ifelse(RACE == 97, "Native Hawaiian/Pacific Islander", "Other/Unknown")))))))) %>%
+  mutate(race_census = factor(race_census, levels = c("White", "Black", "Hispanic", "Asian", "Native Hawaiian/Pacific Islander", "American Indian/Alaska Native", "Other/Unknown")))
+
+## Race - condensed for analysis to consolidate low counts
+puf <- puf %>%
+  mutate(race_condensed = ifelse(race_census == "Asian" |
+                                 race_census == "Native Hawaiian/Pacific Islander" |
+                                 race_census == "American Indian/Alaska Native" |
+                                 race_census == "Other/Unknown", "Other/Unknown",
+                                 ifelse(race_census == "White", "White",
+                                        ifelse(race_census == "Black", "Black",
+                                               ifelse(race_census == "Hispanic", "Hispanic", race_census))))) %>%
+  mutate(race_condensed = factor(race_condensed, levels = c("White", "Black", "Hispanic", "Other/Unknown")))  
+
+## Insurance - convert to government (Medicaid/Medicare/other gov), private, uninsured, unknown
+puf <- puf %>%
+  mutate(insurance_cat = ifelse(INSURANCE_STATUS == 0, "Uninsured",
+                         ifelse(INSURANCE_STATUS == 1, "Private",
+                         ifelse(INSURANCE_STATUS >= 2 & INSURANCE_STATUS <= 4, "Medicaid/Medicare/Other Government", "Unknown")))) %>%
+  mutate(insurance_cat = factor(insurance_cat, levels = c("Medicaid/Medicare/Other Government", "Private", "Uninsured", "Unknown")))
+
+## Insurance - condensed for analysis to consolidate low counts
+puf <- puf %>%
+  mutate(insurance_condensed = ifelse(insurance_cat == "Uninsured" |
+                                      insurance_cat == "Unknown", "Uninsured/Unknown",
+                                      ifelse(insurance_cat == "Medicaid/Medicare/Other Government", "Medicaid/Medicare/Other Government",
+                                             ifelse(insurance_cat == "Private", "Private", insurance_cat)))) %>%
+  mutate(insurance_condensed = factor(insurance_condensed, levels = c("Medicaid/Medicare/Other Government", "Private", "Uninsured/Unknown")))
+
+## Residential setting - convert to Metro, Urban, Rural
+puf <- puf %>%
+  mutate(residence_type = ifelse(UR_CD_13 == 1 | UR_CD_13 == 2 | UR_CD_13 == 3, "Metro",
+                          ifelse(UR_CD_13 == 8 | UR_CD_13 == 9, "Rural",
+                          ifelse(UR_CD_13 == 4 | UR_CD_13 == 5 | UR_CD_13 == 6 | UR_CD_13 == 7, "Urban", 
+                          "Unknown")))) %>%
+  mutate(residence_type = ifelse(is.na(residence_type), "Unknown", residence_type)) %>% ## ***USE THIS CODE TO SUB OUT NAs WITH UNKNOWN***
+  mutate(residence_type = factor(residence_type, levels = c("Metro", "Urban", "Rural", "Unknown")))
+
+## Income quartile - convert to quartiles (<$46,277, $46,277-$57,856, $57,857-$74,062, >$74,062)
+puf <- puf %>%
+  mutate(income_cat = ifelse(MED_INC_QUAR_2020 == 1, "<$46,277",
+                      ifelse(MED_INC_QUAR_2020 == 2, "$46,277-$57,856",
+                      ifelse(MED_INC_QUAR_2020 == 3, "$57,857-$74,062",
+                      ifelse(MED_INC_QUAR_2020 == 4, ">$74,062", NA))))) %>%
+  mutate(income_cat = ifelse(is.na(income_cat), "Unknown", income_cat)) %>% ## ***USE THIS CODE TO SUB OUT NAs WITH UNKNOWN***
+  mutate(income_cat = factor(income_cat, levels = c(">$74,062", "$57,857-$74,062", "$46,277-$57,856", "<$46,277", "Unknown")))
+
+## Education - convert to quartiles (% who did not graduate from HS - >15.2%, 9.1%-15.2%, 5.0%-9.0%, <5.0%)
+puf <- puf %>%
+  mutate(ed_cat = ifelse(NO_HSD_QUAR_2020 == 1, ">15.2%",
+                      ifelse(NO_HSD_QUAR_2020 == 2, "9.1%-15.2%",
+                      ifelse(NO_HSD_QUAR_2020 == 3, "5.0%-9.0%",
+                      ifelse(NO_HSD_QUAR_2020 == 4, "<5.0%", NA))))) %>%
+  mutate(ed_cat = ifelse(is.na(ed_cat), "Unknown", ed_cat)) %>% ## ***USE THIS CODE TO SUB OUT NAs WITH UNKNOWN***
+  mutate(ed_cat = factor(ed_cat, levels = c("<5.0%",  "5.0%-9.0%", "9.1%-15.2%", ">15.2%", "Unknown")))
+
+## Distance from facility to residence - convert to <10 miles, >= 10 miles
+puf <- puf %>%
+  mutate(hospital_dist = ifelse(CROWFLY < 10, "<10 miles",
+                         ifelse(CROWFLY >= 10, "≥10 miles", NA))) %>%
+    mutate(hospital_dist = ifelse(is.na(hospital_dist), "Unknown", hospital_dist)) %>% ## ***USE THIS CODE TO SUB OUT NAs WITH UNKNOWN***
+  mutate(hospital_dist = factor(hospital_dist, levels = c("<10 miles", "≥10 miles", "Unknown")))
+
+## Facility type/Facility region - **not included - data for <39 y.o. is not reported**
+
+# Recode survival data (inverted in NCDB)
+## New variable for survival (vital_KM)
+## Set 1 = dead, 0 = alive
+puf <- puf %>%
+  mutate(vital_KM = recode(PUF_VITAL_STATUS, "0" = TRUE, "1" = FALSE))
+```
+# 2.1 - Primary analysis: stage II pure seminoma OS by primary treatment type - Demographics
+```{r}
+print("Age - by upfront treatment type")
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND")
+age_range_sem_rplnd <- broom::tidy(summary(working$AGE)) %>%
+  mutate(category = "Seminoma+RPLND", .before = 1)
+
+print("Age - Chemo")
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "Chemo")
+age_range_sem_chemo <- broom::tidy(summary(working$AGE)) %>%
+  mutate(category = "Seminoma+Chemo", .before = 1)
+
+print("Age - RT")
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RT")
+age_range_sem_RT <- broom::tidy(summary(working$AGE)) %>%
+  mutate(category = "Seminoma+RT", .before = 1)
+
+age_export <- rbind(age_range_sem_rplnd, age_range_sem_chemo, age_range_sem_RT)
+write.csv(age_export, "table_001_OS_primtx_age.csv")
+
+# set the working dataset for rest of chunk - pure seminoma
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma")
+print("Age - ANOVA")
+anova_age <- aov(AGE ~ prim_tx, data = working)
+anova_age_temp <- unlist(summary(anova_age))
+write.csv(anova_age_temp, "table_002_OS_primtx_age_anova.csv")
+
+## Initial comparison of covariate distributions
+## If chi-square test throws warning, then substitute Fisher's exact test
+## Year of diagnosis
+print("Year of diagnosis - by upfront treatment type")
+table(working$prim_tx, working$year_thirds)
+output_01 <- broom::tidy(chisq.test(working$prim_tx, working$year_thirds)) %>%
+  mutate(variable = "Year of diagnosis", .before = 1) %>%
+  select(variable, p.value, method)
+# fisher.test(working$prim_tx, working$year_thirds, simulate.p.value = TRUE)
+
+## Charlson-Deyo score
+print("Charlson-Deyo score by upfront treatment")
+table(working$prim_tx, working$CDCC_TOTAL_BEST)
+# chisq.test(working$prim_tx, working$CDCC_TOTAL_BEST)
+fisher.test(working$prim_tx, working$CDCC_TOTAL_BEST, simulate.p.value = TRUE)
+output_02 <- broom::tidy(fisher.test(working$prim_tx, working$CDCC_TOTAL_BEST, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Charlson score", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Race by upfront treatment")
+table(working$prim_tx, working$race_census)
+chisq.test(working$prim_tx, working$race_condensed)
+output_03 <- broom::tidy(fisher.test(working$prim_tx, working$race_condensed, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Race", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Insurance by upfront treatment")
+table(working$prim_tx, working$insurance_cat)
+chisq.test(working$prim_tx, working$insurance_condensed)
+output_04 <- broom::tidy(chisq.test(working$prim_tx, working$insurance_condensed)) %>%
+  mutate(variable = "Insurance", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Residential setting by upfront treatment")
+table(working$prim_tx, working$residence_type)
+chisq.test(working$prim_tx, working$residence_type)
+output_05 <- broom::tidy(chisq.test(working$prim_tx, working$residence_type)) %>%
+  mutate(variable = "Residence type", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Income quartile by upfront treatment")
+table(working$prim_tx, working$income_cat)
+chisq.test(working$prim_tx, working$income_cat)
+output_06 <- broom::tidy(chisq.test(working$prim_tx, working$income_cat)) %>%
+  mutate(variable = "Income category", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Education level by upfront treatment")
+table(working$prim_tx, working$ed_cat)
+chisq.test(working$prim_tx, working$ed_cat)
+output_07 <- broom::tidy(chisq.test(working$prim_tx, working$ed_cat)) %>%
+  mutate(variable = "Education category", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Distance from residence to facility by upfront treatment")
+table(working$prim_tx, working$hospital_dist)
+chisq.test(working$prim_tx, working$hospital_dist)
+output_08 <- broom::tidy(chisq.test(working$prim_tx, working$hospital_dist)) %>%
+  mutate(variable = "Hospital distance", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Tumor size by upfront treatment")
+table(working$prim_tx, working$tumorsize)
+chisq.test(working$prim_tx, working$tumorsize)
+output_09 <- broom::tidy(chisq.test(working$prim_tx, working$tumorsize)) %>%
+  mutate(variable = "Tumor size", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Positive surgical margin by upfront treatment")
+table(working$prim_tx, working$pR)
+chisq.test(working$prim_tx, working$pR)
+output_10 <- broom::tidy(chisq.test(working$prim_tx, working$pR)) %>%
+  mutate(variable = "Orchiectomy margin", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Pathological T stage by upfront treatment")
+table(working$prim_tx, working$pT)
+fisher.test(working$prim_tx, working$pT, simulate.p.value = TRUE)
+output_11 <- broom::tidy(fisher.test(working$prim_tx, working$pT, simulate.p.value = TRUE)) %>%
+  mutate(variable = "pT", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Clinical N stage by upfront treatment")
+table(working$prim_tx, working$cN_factor)
+chisq.test(working$prim_tx, working$cN_factor)
+output_12 <- broom::tidy(chisq.test(working$prim_tx, working$cN_factor)) %>%
+  mutate(variable = "cN", .before = 1) %>%
+  select(variable, p.value, method)
+
+# Export all the results of above into a single spreadsheet
+output <- rbind(output_01, output_02, output_03, output_04, output_05, output_06, output_07, output_08, output_09, output_10, output_11, output_12)
+write.csv(output, "table_003_OS_primtx_allvars_stats.csv")
+
+# Export raw covariate numbers (Table 1 data)
+
+out <- rbind(table(working$year_thirds, working$prim_tx),
+            table(working$CDCC_TOTAL_BEST, working$prim_tx),
+            table(working$race_census, working$prim_tx),
+            table(working$insurance_cat, working$prim_tx),
+            table(working$residence_type, working$prim_tx),
+            table(working$income_cat, working$prim_tx),
+            table(working$ed_cat, working$prim_tx),
+            table(working$hospital_dist, working$prim_tx),
+            table(working$tumorsize, working$prim_tx),
+            table(working$pR, working$prim_tx),
+            table(working$pT, working$prim_tx),
+            table(working$cN_factor, working$prim_tx),
+            table(working$pN_factor, working$prim_tx))
+
+write.csv(out, "table_004_OS_primtx_allvars.csv")
+
+```
+# 2.2 - (stage II pure seminoma OS by primary treatment type) KM curves
+```{r}
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma")
+
+f_KM_prim_tx <- survfit(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ prim_tx, data = working)
+
+p_KM_prim_tx <- ggsurvplot(f_KM_prim_tx,
+                             title = "A",
+                             font.title = c(11),
+                             censor.shape = "|",
+                             censor.size = 2,
+                             conf.int = TRUE,
+                             break.time.by = 36,
+                             # surv.plot.height = 1.5,
+                             risk.table = "nrisk_cumcensor",
+                             risk.table.col = "black",
+                             risk.table.fontsize = 3,
+                             font.risk.table.title = c(1),
+                             tables.height = 0.1,
+                             surv.plot.height = 0.7,
+                             legend = "none",
+                             linetype = "strata",
+                             surv.median.line = "hv",
+                             xlim = c(0,216),
+                             xlab = "Time (months)",
+                             ylim = c(0, 1),
+                             ylab = "Overall survival probability",
+                             legend.labs = c("RPLND", "Chemotherapy", "Radiation"),
+                             ggtheme = theme_classic(),
+                             palette = pal_lancet("lanonc", alpha = 0.6) (3))
+
+p_KM_upfront_combined <- p_KM_prim_tx$plot/p_KM_prim_tx$table
+graph2svg(x = p_KM_upfront_combined, file = "figure_02a_OS_primtx.svg", height = 4.5, width = 7) # save as SVG without caption
+```
+# 2.3 - (stage II pure seminoma OS by primary treatment type) Univariate, unadjusted Cox for OS including all variables
+```{r}
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma")
+
+print("Year of diagnosis")
+cox_os_uni_year <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ year_thirds, data = working, x = TRUE)
+summary(cox_os_uni_year)
+cox_os_uni_year_long <- tidy(cox_os_uni_year, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Age")
+cox_os_uni_age <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ AGE, data = working, x = TRUE)
+summary(cox_os_uni_age)
+cox_os_uni_age_long <- tidy(cox_os_uni_age, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Charlson-Deyo score")
+cox_os_uni_charlson <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ CDCC_TOTAL_BEST, data = working, x = TRUE)
+summary(cox_os_uni_charlson)
+cox_os_uni_charlson_long <- tidy(cox_os_uni_charlson, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Race")
+cox_os_uni_race <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ race_condensed, data = working, x = TRUE)
+summary(cox_os_uni_race)
+cox_os_uni_race_long <- tidy(cox_os_uni_race, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Insurance")
+cox_os_uni_insurance <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ insurance_condensed, data = working, x = TRUE)
+summary(cox_os_uni_insurance)
+cox_os_uni_insurance_long <- tidy(cox_os_uni_insurance, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Residential setting")
+cox_os_uni_residence <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ residence_type, data = working, x = TRUE)
+summary(cox_os_uni_residence)
+cox_os_uni_residence_long <- tidy(cox_os_uni_residence, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Income quartile")
+cox_os_uni_income <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ income_cat, data = working, x = TRUE)
+summary(cox_os_uni_income)
+cox_os_uni_income_long <- tidy(cox_os_uni_income, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Education level")
+cox_os_uni_edu <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ ed_cat, data = working, x = TRUE)
+summary(cox_os_uni_edu)
+cox_os_uni_edu_long <- tidy(cox_os_uni_edu, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Distance from residence to facility")
+cox_os_uni_dist <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ hospital_dist, data = working, x = TRUE)
+summary(cox_os_uni_dist)
+cox_os_uni_dist_long <- tidy(cox_os_uni_dist, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Tumor size")
+cox_os_uni_size <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ tumorsize, data = working, x = TRUE)
+summary(cox_os_uni_size)
+cox_os_uni_size_long <- tidy(cox_os_uni_size, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Positive surgical margin")
+cox_os_uni_margin <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ pR, data = working, x = TRUE)
+summary(cox_os_uni_margin)
+cox_os_uni_margin_long <- tidy(cox_os_uni_margin, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Pathological T stage")
+cox_os_uni_pT <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ pT, data = working, x = TRUE)
+summary(cox_os_uni_pT)
+cox_os_uni_pT_long <- tidy(cox_os_uni_pT, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Clinical N stage")
+cox_os_uni_cN <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ cN_factor, data = working, x = TRUE)
+summary(cox_os_uni_cN)
+cox_os_uni_cN_long <- tidy(cox_os_uni_cN, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Primary treatment type")
+cox_os_uni_prim_tx <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ prim_tx, data = working, x = TRUE)
+summary(cox_os_uni_prim_tx)
+cox_os_uni_prim_tx_long <- tidy(cox_os_uni_prim_tx, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+cox_os_prim_tx_uni <- rbind(cox_os_uni_year_long, cox_os_uni_age_long, cox_os_uni_charlson_long, cox_os_uni_race_long, cox_os_uni_insurance_long, cox_os_uni_residence_long, cox_os_uni_income_long, cox_os_uni_edu_long, cox_os_uni_dist_long, cox_os_uni_size_long, cox_os_uni_margin_long, cox_os_uni_pT_long, cox_os_uni_cN_long, cox_os_uni_prim_tx_long) # combine all results into a single spreadsheet
+
+write.csv(cox_os_prim_tx_uni, "table_005_OS_semstage2_uni.csv")
+```
+# 2.4 - (stage II pure seminoma OS by primary treatment type) Multivariate Cox model adjusted for selected covariates
+## AGE, insurance_condensed, CDCC_TOTAL_BEST, income_cat, ed_cat, all disease vars, var of interest (prim_tx)
+## Selection based on significant covariates after univar and a priori potentially clinically significant variables
+```{r}
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma")
+
+cox_os_prim_tx_mv <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ AGE + insurance_condensed + CDCC_TOTAL_BEST + income_cat + ed_cat + pR + pT + cN_factor + prim_tx, data = working, x = TRUE)
+summary(cox_os_prim_tx_mv)
+
+# code for exporting table, comment out if not exporting
+output <- tidy(cox_os_prim_tx_mv, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+write.csv(output, file = "table_006_OS_semstage2_mv.csv")
+```
+# 2.5 - (stage II pure seminoma OS by primary treatment type) Sensitivity analysis - energy-balancing weighting
+```{r}
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma")
+
+# energy balancing (Huling and Mak, 2024)
+w.os <- weightit(prim_tx ~ year_thirds + AGE + CDCC_TOTAL_BEST + race_condensed + insurance_condensed + residence_type + income_cat + ed_cat + hospital_dist + tumorsize + pR + pT + cN_factor, data = working, method = "energy", estimand = "ATT", focal = "RPLND")
+
+# checking balance pre/post weighting
+w.os.bal <- bal.tab(w.os, un = TRUE)
+write.csv(w.os.bal$Balance.Across.Pairs, file = "table_007_OS_semstage2_prepostbal.csv") # export pre/post weighting balance (standardized mean differences)
+
+# repeat MV Cox with weights
+cox_os_prim_tx_mv_w <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ AGE + insurance_condensed + CDCC_TOTAL_BEST + income_cat + ed_cat + pR + pT + cN_factor + prim_tx, data = working, weights = w.os$weights, x = TRUE)
+summary(cox_os_prim_tx_mv_w)
+
+# code for exporting new MV Cox with weights
+output <- tidy(cox_os_prim_tx_mv_w, exponentiate = TRUE, conf.int = TRUE, conf.level = 0.95)
+write.csv(output, file = "table_008_OS_semstage2_mv_energybalanced.csv")
+```
+# 3.1 - Secondary analysis part 1: OS for primary RPLND in stage II seminoma vs nsGCT - Demographics
+```{r}
+print("Age - Primary RPLND - pure seminoma")
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND")
+summary(working$AGE)
+age_range_hist_sem <- broom::tidy(summary(working$AGE)) %>%
+  mutate(category = "RPLND+sem", .before = 1)
+
+print("Age - Primary RPLND - nsGCT")
+working <- puf %>%
+  filter(sem_YN == "nsGCT" & prim_tx == "RPLND")
+summary(working$AGE)
+age_range_hist_ns <- broom::tidy(summary(working$AGE)) %>%
+  mutate(category = "RPLND+nsGCT", .before = 1)
+
+age_export <- rbind(age_range_hist_sem, age_range_hist_ns)
+write.csv(age_export, "table_009_OS_hist_age.csv")
+
+# set the working dataset for pure seminoma/nsGCT + primary RPLND
+working <- puf %>%
+  filter(prim_tx == "RPLND")
+
+print("Age - ANOVA")
+anova_age <- aov(AGE ~ sem_YN, data = working)
+summary(anova_age)
+anova_age_temp <- unlist(summary(anova_age))
+write.csv(anova_age_temp, "table_010_OS_hist_anova.csv")
+
+## Year of diagnosis
+print("Year of diagnosis - by histology type")
+table(working$sem_YN, working$year_thirds)
+chisq.test(working$sem_YN, working$year_thirds)
+# fisher.test(working$sem_YN, working$year_thirds, simulate.p.value = TRUE)
+output_01 <- broom::tidy(chisq.test(working$sem_YN, working$year_thirds)) %>%
+  mutate(variable = "Year of diagnosis", .before = 1) %>%
+  select(variable, p.value, method)
+
+## Charlson-Deyo score
+print("Charlson-Deyo score by histology")
+table(working$sem_YN, working$CDCC_TOTAL_BEST)
+# chisq.test(working$sem_YN, working$CDCC_TOTAL_BEST)
+fisher.test(working$sem_YN, working$CDCC_TOTAL_BEST, simulate.p.value = TRUE)
+output_02 <- broom::tidy(fisher.test(working$sem_YN, working$CDCC_TOTAL_BEST, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Charlson score", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Race by histology")
+table(working$sem_YN, working$race_census)
+chisq.test(working$sem_YN, working$race_condensed)
+output_03 <- broom::tidy(fisher.test(working$sem_YN, working$race_condensed, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Race", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Insurance by histology")
+table(working$sem_YN, working$insurance_cat)
+chisq.test(working$sem_YN, working$insurance_condensed)
+output_04 <- broom::tidy(fisher.test(working$sem_YN, working$insurance_condensed, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Insurance", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Residential setting by histology")
+table(working$sem_YN, working$residence_type)
+chisq.test(working$sem_YN, working$residence_type)
+# fisher.test(working$sem_YN, working$residence_type, simulate.p.value = TRUE)
+output_05 <- broom::tidy(chisq.test(working$sem_YN, working$residence_type)) %>%
+  mutate(variable = "Residential setting", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Income quartile by histology")
+table(working$sem_YN, working$income_cat)
+chisq.test(working$sem_YN, working$income_cat)
+# fisher.test(working$sem_YN, working$income_cat, simulate.p.value = TRUE)
+output_06 <- broom::tidy(chisq.test(working$sem_YN, working$income_cat)) %>%
+  mutate(variable = "Income quartile", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Education level by histology")
+table(working$sem_YN, working$ed_cat)
+chisq.test(working$sem_YN, working$ed_cat)
+# fisher.test(working$sem_YN, working$ed_cat, simulate.p.value = TRUE)
+output_07 <- broom::tidy(chisq.test(working$sem_YN, working$ed_cat)) %>%
+  mutate(variable = "Education level", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Distance from residence to facility by histology")
+table(working$sem_YN, working$hospital_dist)
+chisq.test(working$sem_YN, working$hospital_dist)
+# fisher.test(working$sem_YN, working$hospital_dist, simulate.p.value = TRUE)
+output_08 <- broom::tidy(chisq.test(working$sem_YN, working$hospital_dist)) %>%
+  mutate(variable = "Distance from hospital", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Tumor size by histology")
+table(working$sem_YN, working$tumorsize)
+chisq.test(working$sem_YN, working$tumorsize)
+output_09 <- broom::tidy(chisq.test(working$sem_YN, working$tumorsize)) %>%
+  mutate(variable = "Tumor size", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Positive surgical margin by histology")
+table(working$sem_YN, working$pR)
+chisq.test(working$sem_YN, working$pR)
+# fisher.test(working$sem_YN, working$pR, simulate.p.value = TRUE)
+output_10 <- broom::tidy(chisq.test(working$sem_YN, working$pR)) %>%
+  mutate(variable = "Orchiectomy margin", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Pathological T stage by histology")
+table(working$sem_YN, working$pT)
+# chisq.test(working$sem_YN, working$pT)
+fisher.test(working$sem_YN, working$pT, simulate.p.value = TRUE)
+output_11 <- broom::tidy(fisher.test(working$sem_YN, working$pT, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Pathological T stage", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Clinical N stage by histology")
+table(working$sem_YN, working$cN_factor)
+chisq.test(working$sem_YN, working$cN_factor)
+# fisher.test(working$sem_YN, working$cN_factor, simulate.p.value = TRUE)
+output_12 <- broom::tidy(chisq.test(working$sem_YN, working$cN_factor)) %>%
+  mutate(variable = "Clinical N stage", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Pathological N stage by histology")
+table(working$sem_YN, working$pN_factor)
+chisq.test(working$sem_YN, working$pN_factor)
+# fisher.test(working$sem_YN, working$pN_factor, simulate.p.value = TRUE)
+output_13 <- broom::tidy(chisq.test(working$sem_YN, working$pN_factor)) %>%
+  mutate(variable = "Pathological N stage", .before = 1) %>%
+  select(variable, p.value, method)
+
+output <- rbind(output_01, output_02, output_03, output_04, output_05, output_06, output_07, output_08, output_09, output_10, output_11, output_12, output_13)
+write.csv(output, "table_011_OS_hist_allvars_stats.csv")
+
+out <- rbind(table(working$year_thirds, working$sem_YN),
+            table(working$CDCC_TOTAL_BEST, working$sem_YN),
+            table(working$race_census, working$sem_YN),
+            table(working$insurance_cat, working$sem_YN),
+            table(working$residence_type, working$sem_YN),
+            table(working$income_cat, working$sem_YN),
+            table(working$ed_cat, working$sem_YN),
+            table(working$hospital_dist, working$sem_YN),
+            table(working$tumorsize, working$sem_YN),
+            table(working$pR, working$sem_YN),
+            table(working$pT, working$sem_YN),
+            table(working$cN_factor, working$sem_YN),
+            table(working$pN_factor, working$sem_YN))
+
+write.csv(out, "table_012_OS_hist_allvars.csv")
+```
+# 3.2 - (OS for primary RPLND in stage II seminoma vs nsGCT) KM curves
+```{r}
+working <- puf %>%
+  filter(prim_tx == "RPLND")
+
+f_KM_hist <- survfit(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ sem_YN, data = working)
+
+p_KM_hist <- ggsurvplot(f_KM_hist,
+                             title = "B",
+                             font.title = c(11),
+                             censor.shape = "|",
+                             censor.size = 2,
+                             conf.int = TRUE,
+                             break.time.by = 36,
+                             # surv.plot.height = 1.5,
+                             risk.table = "nrisk_cumcensor",
+                             risk.table.col = "black",
+                             risk.table.fontsize = 3,
+                             font.risk.table.title = c(1),
+                             tables.height = 0.1,
+                             surv.plot.height = 0.7,
+                             legend = "none",
+                             linetype = "strata",
+                             surv.median.line = "hv",
+                             xlim = c(0,216),
+                             xlab = "Time (months)",
+                             ylim = c(0, 1),
+                             ylab = "Overall survival probability",
+                             legend.labs = c("Seminoma", "nsGCT"),
+                             ggtheme = theme_classic(),
+                             palette = pal_lancet("lanonc", alpha = 1) (2))
+
+p_KM_hist_combined <- p_KM_hist$plot/p_KM_hist$table # arrange plot over risk table
+graph2svg(x = p_KM_hist_combined, file = "figure_02b_OS_hist.svg", height = 4.5, width = 7) # save as SVG without caption
+
+# Create combined figure - with and without caption
+# - first with caption
+p_KM_hist_combined <- p_KM_hist_combined + labs(caption = "Figure 2. Kaplan-Meier estimated overall survival curves for CSII seminoma by primary treatment (A)\nand by histology for primary RPLND (B)") +
+  theme(plot.caption = element_text(hjust = 0)) # add caption
+p_KM_primtx_hist <- ggarrange(p_KM_upfront_combined, p_KM_hist_combined,
+                              ncol = 1, nrow = 2) # combine curves
+graph2svg(x = p_KM_primtx_hist, file = "figure_02_OS_hist.svg", height = 9, width = 7)
+
+# - now without caption
+p_KM_hist_combined <- p_KM_hist$plot/p_KM_hist$table # reset plot, no caption
+p_KM_primtx_hist <- ggarrange(p_KM_upfront_combined, p_KM_hist_combined, # combine curves
+                              ncol = 1, nrow = 2)
+graph2svg(x = p_KM_primtx_hist, file = "figure_02_OS_hist_nocap.svg", height = 9, width = 7)
+```
+# 3.3 - (OS for primary RPLND in stage II seminoma vs nsGCT) Univariate, unadjusted Cox for OS in primary RPLND on all variables
+```{r}
+working <- puf %>%
+  filter(prim_tx == "RPLND")
+
+print("Year of diagnosis")
+cox_os_uni_year <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ year_thirds, data = working, x = TRUE)
+summary(cox_os_uni_year)
+cox_os_uni_year_long <- tidy(cox_os_uni_year, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Age")
+cox_os_uni_age <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ AGE, data = working, x = TRUE)
+summary(cox_os_uni_age)
+cox_os_uni_age_long <- tidy(cox_os_uni_age, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Charlson-Deyo score")
+cox_os_uni_charlson <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ CDCC_TOTAL_BEST, data = working, x = TRUE)
+summary(cox_os_uni_charlson)
+cox_os_uni_charlson_long <- tidy(cox_os_uni_charlson, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Race")
+cox_os_uni_race <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ race_condensed, data = working, x = TRUE)
+summary(cox_os_uni_race)
+cox_os_uni_race_long <- tidy(cox_os_uni_race, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Insurance")
+cox_os_uni_insurance <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ insurance_condensed, data = working, x = TRUE)
+summary(cox_os_uni_insurance)
+cox_os_uni_insurance_long <- tidy(cox_os_uni_insurance, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Residential setting")
+cox_os_uni_residence <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ residence_type, data = working, x = TRUE)
+summary(cox_os_uni_residence)
+cox_os_uni_residence_long <- tidy(cox_os_uni_residence, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Income quartile")
+cox_os_uni_income <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ income_cat, data = working, x = TRUE)
+summary(cox_os_uni_income)
+cox_os_uni_income_long <- tidy(cox_os_uni_income, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Education level")
+cox_os_uni_edu <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ ed_cat, data = working, x = TRUE)
+summary(cox_os_uni_edu)
+cox_os_uni_edu_long <- tidy(cox_os_uni_edu, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Distance from residence to facility")
+cox_os_uni_dist <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ hospital_dist, data = working, x = TRUE)
+summary(cox_os_uni_dist)
+cox_os_uni_dist_long <- tidy(cox_os_uni_dist, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Tumor size")
+cox_os_uni_size <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ tumorsize, data = working, x = TRUE)
+summary(cox_os_uni_size)
+cox_os_uni_size_long <- tidy(cox_os_uni_size, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Positive surgical margin")
+cox_os_uni_margin <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ pR, data = working, x = TRUE)
+summary(cox_os_uni_margin)
+cox_os_uni_margin_long <- tidy(cox_os_uni_margin, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Pathological T stage")
+cox_os_uni_pT <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ pT, data = working, x = TRUE)
+summary(cox_os_uni_pT)
+cox_os_uni_pT_long <- tidy(cox_os_uni_pT, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Clinical N stage")
+cox_os_uni_cN <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ cN_factor, data = working, x = TRUE)
+summary(cox_os_uni_cN)
+cox_os_uni_cN_long <- tidy(cox_os_uni_cN, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Pathologic N stage")
+cox_os_uni_pN <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ pN_factor, data = working, x = TRUE)
+summary(cox_os_uni_pN)
+cox_os_uni_pN_long <- tidy(cox_os_uni_pN, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+cox_os_prim_tx_uni <- rbind(cox_os_uni_year_long, cox_os_uni_age_long, cox_os_uni_charlson_long, cox_os_uni_race_long, cox_os_uni_insurance_long, cox_os_uni_residence_long, cox_os_uni_income_long, cox_os_uni_edu_long, cox_os_uni_dist_long, cox_os_uni_size_long, cox_os_uni_margin_long, cox_os_uni_pT_long, cox_os_uni_cN_long, cox_os_uni_pN_long)
+
+write.csv(cox_os_prim_tx_uni, "table_013_OS_rplnd_uni.csv")
+
+```
+# 3.4 - (OS for primary RPLND in stage II seminoma vs nsGCT) Multivariate Cox model adjusted for selected covariates
+## AGE, CDCC_TOTAL_BEST, insurance_condensed, income_cat, ed_cat, pR, pT, pN_factor
+## Selection based on significant covariates and a priori potentially clinically significant variables
+```{r}
+working <- puf %>%
+  filter(prim_tx == "RPLND") %>%
+  mutate(sem_YN = factor(sem_YN, levels = c("Pure seminoma", "nsGCT")))
+
+cox_os_hist_mv <- coxph(Surv(DX_LASTCONTACT_DEATH_MONTHS, vital_KM) ~ AGE + CDCC_TOTAL_BEST + insurance_condensed + income_cat + ed_cat + pR + pT + pN_factor + cN_factor + sem_YN, data = working, x = TRUE)
+summary(cox_os_hist_mv)
+
+# code for exporting table, comment out if not exporting
+output <- tidy(cox_os_hist_mv, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+write.csv(output, file = "table_014_OS_rplnd_mv.csv")
+```
+# 4.1 - Secondary analysis part 2: salvage-free survival for primary RPLND in stage II seminoma - Demographics
+## Exclude adjuvant treatment (received <2 months)
+```{r}
+print("Age - Primary RPLND (pure seminoma) - received additional salvage treatment")
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND" & adj_salv == "Salvage")
+summary(working$AGE)
+age_range_rplndsem_salv <- broom::tidy(summary(working$AGE)) %>%
+  mutate(category = "RPLND+salvage", .before = 1)
+
+print("Age - Primary RPLND (pure seminoma) - no additional salvage treatment")
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND" & adj_salv == "None/Unknown")
+summary(working$AGE)
+age_range_rplndsem_nosalv <- broom::tidy(summary(working$AGE)) %>%
+  mutate(category = "RPLND-salvage", .before = 1)
+
+age_export <- rbind(age_range_rplndsem_salv, age_range_rplndsem_nosalv)
+write.csv(age_export, "table_021_SFS_rplndsem.csv")
+
+# set the working dataset for pure seminoma + primary RPLND without adjuvant tx
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND") %>%
+  filter(adj_salv == "Salvage" | adj_salv == "None/Unknown")
+
+print("Age - ANOVA")
+anova_age <- aov(AGE ~ adj_salv, data = working)
+summary(anova_age)
+anova_age_temp <- unlist(summary(anova_age))
+write.csv(anova_age_temp, "table_022_SFS_rplndsem_anova.csv")
+
+## Year of diagnosis
+print("Year of diagnosis - by salvage tx type")
+table(working$adj_salv, working$year_thirds)
+chisq.test(working$adj_salv, working$year_thirds)
+# fisher.test(working$adj_salv, working$year_thirds, simulate.p.value = TRUE)
+output_01 <- broom::tidy(chisq.test(working$adj_salv, working$year_thirds)) %>%
+  mutate(variable = "Year of diagnosis", .before = 1) %>%
+  select(variable, p.value, method)
+
+## Charlson-Deyo score
+print("Charlson-Deyo score by salvage tx")
+table(working$adj_salv, working$CDCC_TOTAL_BEST)
+# chisq.test(working$adj_salv, working$CDCC_TOTAL_BEST)
+fisher.test(working$adj_salv, working$CDCC_TOTAL_BEST, simulate.p.value = TRUE)
+output_02 <- broom::tidy(fisher.test(working$adj_salv, working$CDCC_TOTAL_BEST, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Charlson score", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Race by salvage tx")
+table(working$adj_salv, working$race_condensed)
+fisher.test(working$adj_salv, working$race_condensed, simulate.p.value = TRUE)
+output_03 <- broom::tidy(fisher.test(working$adj_salv, working$race_condensed, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Race", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Insurance by salvage tx")
+table(working$adj_salv, working$insurance_condensed)
+chisq.test(working$adj_salv, working$insurance_condensed)
+output_04 <- broom::tidy(fisher.test(working$adj_salv, working$insurance_condensed, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Insurance", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Residential setting by salvage tx")
+table(working$adj_salv, working$residence_type)
+# chisq.test(working$adj_salv, working$residence_type)
+fisher.test(working$adj_salv, working$residence_type, simulate.p.value = TRUE)
+output_05 <- broom::tidy(fisher.test(working$adj_salv, working$residence_type, simulate.p.value = TRUE)) %>%
+  mutate(variable = "Residential setting", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Income quartile by salvage tx")
+table(working$adj_salv, working$income_cat)
+chisq.test(working$adj_salv, working$income_cat)
+# fisher.test(working$adj_salv, working$income_cat, simulate.p.value = TRUE)
+output_06 <- broom::tidy(chisq.test(working$adj_salv, working$income_cat)) %>%
+  mutate(variable = "Income quartile", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Education level by salvage tx")
+table(working$adj_salv, working$ed_cat)
+chisq.test(working$adj_salv, working$ed_cat)
+# fisher.test(working$adj_salv, working$ed_cat, simulate.p.value = TRUE)
+output_07 <- broom::tidy(chisq.test(working$adj_salv, working$ed_cat)) %>%
+  mutate(variable = "Education", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Distance from residence to facility by salvage tx")
+table(working$adj_salv, working$hospital_dist)
+chisq.test(working$adj_salv, working$hospital_dist)
+# fisher.test(working$adj_salv, working$hospital_dist, simulate.p.value = TRUE)
+output_08 <- broom::tidy(chisq.test(working$adj_salv, working$hospital_dist)) %>%
+  mutate(variable = "Hospital distance", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Tumor size by salvage tx")
+table(working$adj_salv, working$tumorsize)
+chisq.test(working$adj_salv, working$tumorsize)
+output_09 <- broom::tidy(chisq.test(working$adj_salv, working$tumorsize)) %>%
+  mutate(variable = "Tumor size", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Positive surgical margin by salvage tx")
+table(working$adj_salv, working$pR)
+chisq.test(working$adj_salv, working$pR)
+# fisher.test(working$adj_salv, working$pR, simulate.p.value = TRUE)
+output_10 <- broom::tidy(chisq.test(working$adj_salv, working$pR)) %>%
+  mutate(variable = "Orchiectomy margin", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Pathological T stage by salvage tx")
+table(working$adj_salv, working$pT)
+# chisq.test(working$adj_salv, working$pT)
+fisher.test(working$adj_salv, working$pT, simulate.p.value = TRUE)
+output_11 <- broom::tidy(fisher.test(working$adj_salv, working$pT, simulate.p.value = TRUE)) %>%
+  mutate(variable = "pT", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Clinical N stage by salvage tx")
+table(working$adj_salv, working$cN_factor)
+chisq.test(working$adj_salv, working$cN_factor)
+# fisher.test(working$adj_salv, working$cN_factor, simulate.p.value = TRUE)
+output_12 <- broom::tidy(chisq.test(working$adj_salv, working$cN_factor)) %>%
+  mutate(variable = "cN", .before = 1) %>%
+  select(variable, p.value, method)
+
+print("Pathological N stage for by salvage tx")
+table(working$adj_salv, working$pN_factor)
+chisq.test(working$adj_salv, working$pN_factor)
+# fisher.test(working$adj_salv, working$pN_factor, simulate.p.value = TRUE)
+output_13 <- broom::tidy(chisq.test(working$adj_salv, working$pN_factor)) %>%
+  mutate(variable = "pN", .before = 1) %>%
+  select(variable, p.value, method)
+
+output <- rbind(output_01, output_02, output_03, output_04, output_05, output_06, output_07, output_08, output_09, output_10, output_11, output_12, output_13)
+write.csv(output, "table_023_SFS_rplndsem_allvars_stats.csv")
+
+out <- rbind(table(working$year_thirds, working$adj_salv),
+            table(working$CDCC_TOTAL_BEST, working$adj_salv),
+            table(working$race_census, working$adj_salv),
+            table(working$insurance_cat, working$adj_salv),
+            table(working$residence_type, working$adj_salv),
+            table(working$income_cat, working$adj_salv),
+            table(working$ed_cat, working$adj_salv),
+            table(working$hospital_dist, working$adj_salv),
+            table(working$tumorsize, working$adj_salv),
+            table(working$pR, working$adj_salv),
+            table(working$pT, working$adj_salv),
+            table(working$cN_factor, working$adj_salv),
+            table(working$pN_factor, working$adj_salv))
+
+write.csv(out, "table_024_SFS_rplndsem_allvars.csv")
+```
+# 4.2 - (SFS for primary RPLND in stage II seminoma) KM curve
+```{r}
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND") %>%
+  filter(adj_salv == "Salvage" | adj_salv == "None/Unknown")
+
+f_salvtx_KM <- survfit(Surv(delayed_any_interval, delayed_any_KM) ~ 1, data = working)
+
+p_salvtx_KM <- ggsurvplot(f_salvtx_KM,
+                             title = "A",
+                             font.title = c(11),
+                             censor.shape = "|",
+                             censor.size = 2,
+                             conf.int = TRUE,
+                             break.time.by = 12,
+                             # surv.plot.height = 1.5,
+                             risk.table = "nrisk_cumcensor",
+                             risk.table.col = "black",
+                             risk.table.fontsize = 3,
+                             font.risk.table.title = c(1),
+                             tables.height = 0.1,
+                             legend = "none",
+                             surv.median.line = "hv",
+                             xlim = c(1.8, 220),
+                             xlab = "Time (months)",
+                             ylim = c(0, 1),
+                             ylab = "SFS probability",
+                             ggtheme = theme_classic(),
+                             linetype = "strata",
+                             palette = pal_lancet("lanonc", alpha = 1) (3))
+
+p_salvtx_KM_combined <- p_salvtx_KM$plot/p_salvtx_KM$table
+graph2svg(x = p_salvtx_KM_combined, file = "figure_03a_SFS.svg", height = 4.5, width = 10) # save as SVG without caption
+```
+# 4.3 - (SFS for primary RPLND in stage II seminoma) KM curve - stratified by cN
+```{r}
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND") %>%
+  filter(adj_salv == "Salvage" | adj_salv == "None/Unknown")
+
+f_salvtx_KM_cN <- survfit(Surv(delayed_any_interval, delayed_any_KM) ~ cN_factor, data = working)
+
+p_salvtx_KM_cN <- ggsurvplot(f_salvtx_KM_cN,
+                             title = "B",
+                             font.title = c(11),
+                             censor.shape = "|",
+                             censor.size = 2,
+                             conf.int = TRUE,
+                             break.time.by = 12,
+                             # surv.plot.height = 1.5,
+                             risk.table = "nrisk_cumcensor",
+                             risk.table.col = "black",
+                             risk.table.fontsize = 3,
+                             font.risk.table.title = c(1),
+                             tables.height = 0.1,
+                             legend = "none",
+                             surv.median.line = "hv",
+                             xlim = c(1.8, 220),
+                             xlab = "Time (months)",
+                             ylim = c(0, 1),
+                             ylab = "SFS probability",
+                             legend.labs = c("cN1", "cN2", "cN3"),
+                             ggtheme = theme_classic(),
+                             linetype = "strata",
+                             palette = pal_lancet("lanonc", alpha = 1) (3))
+
+p_salvtx_KM_cN_combined <- p_salvtx_KM_cN$plot/p_salvtx_KM_cN$table
+graph2svg(x = p_salvtx_KM_cN_combined, file = "figure_03b_SFS_cN.svg", height = 4.5, width = 10)
+
+# Create combined figure - with and without caption
+# - first with caption
+p_KM_SFS_combined <- p_salvtx_KM_cN_combined + labs(caption = "Figure 3. Kaplan-Meier estimated SFS curves overall after primary RPLND for CSII seminoma (A) and stratified by cN (B)") +
+  theme(plot.caption = element_text(hjust = 0)) # add caption
+p_KM_SFS_overall_cN <- ggarrange(p_salvtx_KM_combined, p_KM_SFS_combined,
+                              ncol = 1, nrow = 2) # combine curves
+graph2svg(x = p_KM_SFS_overall_cN, file = "figure_03_SFS.svg", height = 9, width = 10)
+
+# - now without caption
+p_KM_SFS_combined <- p_salvtx_KM_cN$plot/p_salvtx_KM_cN$table # reset plot, no caption
+p_KM_SFS_overall_cN <- ggarrange(p_salvtx_KM_combined, p_KM_SFS_combined,
+                              ncol = 1, nrow = 2) # combine curves
+graph2svg(x = p_KM_SFS_overall_cN, file = "figure_03_SFS_nocap.svg", height = 9, width = 10)
+```
+# 4.4 - (SFS for primary RPLND in stage II seminoma) Univariate, unadjusted Cox for additional-treatment free survival in primary RPLND on all variables
+```{r}
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND") %>%
+  filter(adj_salv == "Salvage" | adj_salv == "None/Unknown")
+
+print("Year of diagnosis")
+cox_rplnd_sfs_uni_year <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ year_thirds, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_year)
+cox_rplnd_sfs_uni_year_long <- tidy(cox_rplnd_sfs_uni_year, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Age")
+cox_rplnd_sfs_uni_age <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ AGE, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_age)
+cox_rplnd_sfs_uni_age_long <- tidy(cox_rplnd_sfs_uni_age, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Charlson-Deyo score")
+cox_rplnd_sfs_uni_charlson <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ CDCC_TOTAL_BEST, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_charlson)
+cox_rplnd_sfs_uni_charlson_long <- tidy(cox_rplnd_sfs_uni_charlson, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Race")
+cox_rplnd_sfs_uni_race <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ race_condensed, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_race)
+cox_rplnd_sfs_uni_race_long <- tidy(cox_rplnd_sfs_uni_race, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+
+print("Insurance")
+cox_rplnd_sfs_uni_insurance <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ insurance_condensed, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_insurance)
+cox_rplnd_sfs_uni_insurance_long <- tidy(cox_rplnd_sfs_uni_insurance, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+
+print("Residential setting")
+cox_rplnd_sfs_uni_residence <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ residence_type, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_residence)
+cox_rplnd_sfs_uni_residence_long <- tidy(cox_rplnd_sfs_uni_residence, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Income quartile")
+cox_rplnd_sfs_uni_income <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ income_cat, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_income)
+cox_rplnd_sfs_uni_income_long <- tidy(cox_rplnd_sfs_uni_income, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Education level")
+cox_rplnd_sfs_uni_edu <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ ed_cat, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_edu)
+cox_rplnd_sfs_uni_edu_long <- tidy(cox_rplnd_sfs_uni_edu, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Distance from residence to facility")
+cox_rplnd_sfs_uni_dist <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ hospital_dist, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_dist)
+cox_rplnd_sfs_uni_dist_long <- tidy(cox_rplnd_sfs_uni_dist, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Tumor size")
+cox_rplnd_sfs_uni_size <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ tumorsize, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_size)
+cox_rplnd_sfs_uni_size_long <- tidy(cox_rplnd_sfs_uni_size, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Positive surgical margin")
+cox_rplnd_sfs_uni_margin <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ pR, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_margin)
+cox_rplnd_sfs_uni_margin_long <- tidy(cox_rplnd_sfs_uni_margin, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Pathological T stage")
+cox_rplnd_sfs_uni_pT <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ pT, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_pT)
+cox_rplnd_sfs_uni_pT_long <- tidy(cox_rplnd_sfs_uni_pT, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Clinical N stage")
+cox_rplnd_sfs_uni_cN <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ cN_factor, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_cN)
+cox_rplnd_sfs_uni_cN_long <- tidy(cox_rplnd_sfs_uni_cN, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+print("Pathologic N stage")
+cox_rplnd_sfs_uni_pN <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ pN_factor, data = working, x = TRUE)
+summary(cox_rplnd_sfs_uni_pN)
+cox_rplnd_sfs_uni_pN_long <- tidy(cox_rplnd_sfs_uni_pN, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+
+cox_rplnd_sfs_uni <- rbind(cox_rplnd_sfs_uni_year_long, cox_rplnd_sfs_uni_age_long, cox_rplnd_sfs_uni_charlson_long, cox_rplnd_sfs_uni_race_long, cox_rplnd_sfs_uni_insurance_long, cox_rplnd_sfs_uni_residence_long, cox_rplnd_sfs_uni_income_long, cox_rplnd_sfs_uni_edu_long, cox_rplnd_sfs_uni_dist_long, cox_rplnd_sfs_uni_size_long, cox_rplnd_sfs_uni_margin_long, cox_rplnd_sfs_uni_pT_long, cox_rplnd_sfs_uni_cN_long, cox_rplnd_sfs_uni_pN_long)
+
+write.csv(cox_rplnd_sfs_uni, "table_025_SFS_rplnd_uni.csv")
+
+```
+# 4.5 - (SFS for primary RPLND in stage II seminoma) Multivariate Cox model adjusted for selected covariates
+## cN_factor, pN_factor, year_thirds, CDCC, pT
+## Selection based on significant covariates and a priori potentially clinically significant variables
+```{r}
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND") %>%
+  filter(adj_salv == "Salvage" | adj_salv == "None/Unknown")
+
+cox_rplnd_sfs_mv <- coxph(Surv(delayed_any_interval, delayed_any_KM) ~ year_thirds + CDCC_TOTAL_BEST + cN_factor + pN_factor + pT, data = working, x = TRUE)
+summary(cox_rplnd_sfs_mv)
+
+# code for exporting table, comment out if not exporting
+output <- tidy(cox_rplnd_sfs_mv, conf.int = TRUE, conf.level = 0.95, exponentiate = TRUE)
+write.csv(output, file = "table_026_SFS_rplnd_mv.csv")
+```
+
+```{r}
+working <- puf %>%
+  filter(sem_YN == "Pure seminoma" & prim_tx == "RPLND") %>%
+  filter(adj_salv == "Salvage" | adj_salv == "None/Unknown")
+
+summary(survfit(Surv(delayed_any_interval, delayed_any_KM) ~ 1, data = working), times = 24)
+```
+
